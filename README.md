@@ -21,9 +21,33 @@
 It scans installed games, shows original and compressed sizes, tracks saved space, and can safely decompress games back to normal when needed.
 
 > [!IMPORTANT]
-> The compression system uses Windows `compact.exe` with built-in NTFS compression algorithms.  
+> The compression system uses Windows `compact.exe` with built-in NTFS compression algorithms.
+
 > It does **not** repack, crack, delete, or rewrite game archives. FSR management is separate and only replaces DLL files.
 
+## Stats:
+<img width="1920" height="1080" alt="29 98GB (2)" src="https://github.com/user-attachments/assets/c9db3e98-6906-4414-901f-4e7324dc665a" />
+
+## Xzen Compressor vs Competitor - Saved Storage Comparison
+Compared to another compressor's public saved-storage claim, Xzen Compressor saved more storage across the currently matched games.
+
+| Game | Other Compressor Saved | Xzen Compressor Saved | Difference |
+|---|---:|---:|---:|
+| TEKKEN 7 | ~18.10 GB | ~29.98 GB | +65.64% |
+| Forza Horizon 5 | ~7.40 GB | ~6.20 GB | -16.22% |
+| Dying Light 2 | ~9.90 GB | ~19.33 GB | +95.25% |
+| Alan Wake 2 | ~7.20 GB | ~9.64 GB | +33.89% |
+
+### Current Matched Total
+
+- Other compressor saved: **~42.60 GB**
+- Xzen Compressor saved: **~65.15 GB**
+
+> These results do not mean Xzen Compressor will always beat every other compressor in every game. Compression depends on the game, file types, permissions, scan depth, already-compressed files, and how the result is measured.
+>
+> That said, in our current matched-game test set, Xzen Compressor saved **~65.15 GB** compared to the other compressor's **~42.60 GB**, giving Xzen a lead of **~22.55 GB** and about **52.9% more saved storage**.
+>
+> LoL.
 ---
 
 ## Features
