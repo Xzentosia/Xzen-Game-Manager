@@ -33,10 +33,10 @@ Compared to another compressor's public saved-storage claim, Xzen Compressor sav
 
 | Game | Other Compressor Saved | Xzen Compressor Saved | Difference |
 |---|---:|---:|---:|
-| TEKKEN 7 | ~18.10 GB | ~29.98 GB | +65.64% |
-| Forza Horizon 5 | ~7.40 GB | ~6.20 GB | -16.22% |
-| Dying Light 2 | ~9.90 GB | ~19.33 GB | +95.25% |
-| Alan Wake 2 | ~7.20 GB | ~9.64 GB | +33.89% |
+| TEKKEN 7 | ~18.10 GB | ~29.98 GB | +65.64% more |
+| Forza Horizon 5 | ~7.40 GB | ~6.20 GB | -16.22% less |
+| Dying Light 2 | ~9.90 GB | ~19.33 GB | +95.25% more |
+| Alan Wake 2 | ~7.20 GB | ~9.64 GB | +33.89% more |
 
 ### Current Matched Total
 
