@@ -1,0 +1,7 @@
+PyQt5>=5.15
+requests>=2.31
+pydantic>=2.8
+platformdirs>=4.2
+structlog>=24.1
+transitions>=0.9
+pyinstaller>=6.0
