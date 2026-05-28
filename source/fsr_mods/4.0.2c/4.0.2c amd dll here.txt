@@ -1,0 +1,1 @@
+btw yes you can create your own folders of fsr version and add them to the compressor it is auto detected
