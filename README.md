@@ -21,7 +21,7 @@
 It scans installed games, shows original and compressed sizes, tracks saved space, and can safely decompress games back to normal when needed.
 
 > [!IMPORTANT]
-> The compression system uses Windows `compact.exe` with built-in NTFS compression algorithms.
+> The compression system uses Windows `compact.exe` with built-in NTFS compression algorithms. IMPORTANT: due to 25MB limit i cannot share the FSR DLLs on the repository. The releases have them.
 
 > It does **not** repack, crack, delete, or rewrite game archives. FSR management is separate and only replaces DLL files.
 
