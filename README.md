@@ -26,7 +26,7 @@ It scans installed games, shows original and compressed sizes, tracks saved spac
 > It does **not** repack, crack, delete, or rewrite game archives. FSR management is separate and only replaces DLL files.
 
 ## Stats vs Other Game Compressor
-<img width="1920" height="1080" alt="29 98GB (3)" src="https://github.com/user-attachments/assets/23125fa9-7ab9-40aa-9396-41bc21477119" />
+<img width="1920" height="1080" alt="29 98GB" src="https://github.com/user-attachments/assets/e741d76e-0a2e-43e8-8146-2a02388f67e8" />
 
 ## Xzen Compressor vs Competitor - Saved Storage Comparison
 Compared to another compressor's public saved-storage claim, Xzen Compressor saved more storage across the currently matched games.
