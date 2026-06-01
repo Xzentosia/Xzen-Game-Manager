@@ -1,6 +1,6 @@
 <div align="center">
 
-# Xzen Game Compressor - Higanbana
+# Xzen Game Compressor - Higanbana [v0.4.5 upcoming for new improvements]
 
 **A Windows game storage utility for NTFS compression, decompression verification, and FSR package management.**
 
