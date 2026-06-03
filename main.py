@@ -1,4 +1,4 @@
-﻿import os
+import os
 import ctypes
 import sys
 import time
@@ -60,6 +60,7 @@ from source.xzen_engine.app_state import (
     is_game_compressed as state_is_game_compressed,
     load_app_settings,
     load_games as state_load_games,
+    original_game_size as state_original_game_size,
     prune_uninstalled_games as state_prune_uninstalled_games,
     save_app_settings,
     save_games as state_save_games,
@@ -73,6 +74,14 @@ from source.xzen_engine.background_controller import BackgroundRunController
 from source.xzen_engine.constants import APP_ICON_FILE
 from source.xzen_engine.deps import get_logger
 from source.xzen_engine.posters import safe_cache_name
+from source.xzen_engine.theme import color as theme_color, status_pill_style, themed_qss
+from source.xzen_engine.ui_widgets import (
+    CustomTitleBar,
+    DashboardGauge,
+    DashboardMiniCard,
+    QuickStatsFloatingWindow,
+)
+from source.logs import log_action, log_error, log_exception, log_success, log_warning, reset_logs
 from source.xzen_engine.manual_library import (
     is_drive_root_path as state_is_drive_root_path,
     is_manual_library_folder as state_is_manual_library_folder,
@@ -81,421 +90,11 @@ from source.xzen_engine.manual_library import (
     resolve_manual_game_folder as state_resolve_manual_game_folder,
 )
 
-
-class DashboardGauge(QWidget):
+class XzenGameManager(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.saved_bytes = 0
-        self.total_possible_bytes = 0
-        self.setMinimumHeight(280)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-
-    def set_values(self, saved_bytes, total_possible_bytes):
-        self.saved_bytes = int(saved_bytes or 0)
-        self.total_possible_bytes = int(total_possible_bytes or 0)
-        self.update()
-
-    def fitted_font(self, family, text, max_point_size, min_point_size, width, weight=QFont.Normal):
-        for point_size in range(int(max_point_size), int(min_point_size) - 1, -1):
-            font = QFont(family, point_size, weight)
-            metrics = QFontMetrics(font)
-            if metrics.horizontalAdvance(text) <= width:
-                return font
-        return QFont(family, int(min_point_size), weight)
-
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-
-        w = self.width()
-        h = self.height()
-        size = min(w, h) - 50
-        x = (w - size) / 2
-        y = (h - size) / 2 + 10
-        rect = QRectF(x, y, size, size)
-
-        start_angle = 225 * 16
-        span_angle = -270 * 16
-
-                                     
-        outer_rect = rect.adjusted(-15, -15, 15, 15)
-        outer_pen = QPen(QColor("#252233"), 2, Qt.DashLine)
-        painter.setPen(outer_pen)
-        painter.drawArc(outer_rect, start_angle, span_angle)
-
-                               
-        track_pen = QPen(QColor("#15131C"), 22, Qt.SolidLine, Qt.FlatCap)
-        painter.setPen(track_pen)
-        painter.drawArc(rect, start_angle, span_angle)
-
-        percent = 0
-        if self.total_possible_bytes > 0:
-            percent = max(0, min(1, self.saved_bytes / self.total_possible_bytes))
-        
-        active_span = int(span_angle * percent)
-
-        if percent > 0:
-                                  
-            glow_pen = QPen(QColor("#C071FF"), 34, Qt.SolidLine, Qt.FlatCap)
-            glow_pen.setColor(QColor(192, 113, 255, 30))                           
-            painter.setPen(glow_pen)
-            painter.drawArc(rect, start_angle, active_span)
-
-                                
-            core_pen = QPen(QColor("#C071FF"), 16, Qt.SolidLine, Qt.FlatCap)
-            painter.setPen(core_pen)
-            painter.drawArc(rect, start_angle, active_span)
-
-        text_width = max(80, int(size * 0.78))
-        value_font_size = max(16, min(34, int(size * 0.16)))
-        label_font_size = max(8, min(11, int(size * 0.055)))
-        value_rect = QRectF(x + (size - text_width) / 2, y + (size * 0.38), text_width, size * 0.18)
-        label_rect = QRectF(x + (size - text_width) / 2, y + (size * 0.56), text_width, size * 0.12)
-
-                             
-        painter.setPen(QColor("#FFFFFF"))
-        val_str = format_game_size(self.saved_bytes).replace(".00", "")
-        painter.setFont(
-            self.fitted_font(
-                "Segoe UI Variable Display",
-                val_str,
-                value_font_size,
-                14,
-                text_width,
-                QFont.Black,
-            )
-        )
-        painter.drawText(value_rect, Qt.AlignCenter, val_str)
-
-                             
-        painter.setPen(QColor("#C071FF"))
-        label_text = "RECLAIMED SPACE"
-        painter.setFont(
-            self.fitted_font(
-                "Segoe UI Variable",
-                label_text,
-                label_font_size,
-                8,
-                text_width,
-                QFont.Bold,
-            )
-        )
-        painter.drawText(label_rect, Qt.AlignCenter, label_text)
-
-
-class DashboardMiniCard(QFrame):
-    def __init__(self, title, value, accent_color="#C071FF"):
-        super().__init__()
-        self.setObjectName("DashboardMiniCard")
-        self.accent_color = accent_color
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(8)
-        
-        self.title_label = QLabel(title)
-        self.title_label.setStyleSheet(f"color: {accent_color};")
-        
-        self.value_label = QLabel(value)
-        self.value_label.setStyleSheet("color: #FFFFFF;")
-        self.value_label.setWordWrap(True)
-        
-        layout.addWidget(self.title_label)
-        layout.addStretch()
-        layout.addWidget(self.value_label)
-        self.adjust_fonts()
-
-    def fitted_label_font(self, text, max_point_size, min_point_size, weight):
-        available_width = max(60, self.width() - 40)
-        for point_size in range(int(max_point_size), int(min_point_size) - 1, -1):
-            font = QFont("Segoe UI Variable", point_size, weight)
-            metrics = QFontMetrics(font)
-            if metrics.horizontalAdvance(str(text or "")) <= available_width:
-                return font
-        return QFont("Segoe UI Variable", int(min_point_size), weight)
-
-    def adjust_fonts(self):
-        title_font = self.fitted_label_font(self.title_label.text(), 11, 8, QFont.Bold)
-        title_font.setCapitalization(QFont.AllUppercase)
-        value_font = self.fitted_label_font(self.value_label.text(), 28, 14, QFont.Black)
-        self.title_label.setFont(title_font)
-        self.value_label.setFont(value_font)
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self.adjust_fonts()
-
-    def set_value(self, value):
-        self.value_label.setText(str(value))
-        self.adjust_fonts()
-
-
-class CustomTitleBar(QFrame):
-    def __init__(self, window):
-        super().__init__(window)
-        self._window = window
-        self._drag_active = False
-        self._drag_offset = QPoint()
-        self.setObjectName("CustomTitleBar")
-        self.setFixedHeight(42)
-
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(14, 8, 8, 8)
-        layout.setSpacing(8)
-
-        self.title_label = QLabel(APP_NAME)
-        self.title_label.setObjectName("CustomTitleLabel")
-
-        self.min_button = QPushButton("–")
-        self.min_button.setObjectName("TitleBarButton")
-        self.min_button.setFixedSize(34, 24)
-        self.min_button.clicked.connect(self._window.showMinimized)
-
-        self.max_button = QPushButton("□")
-        self.max_button.setObjectName("TitleBarButton")
-        self.max_button.setFixedSize(34, 24)
-        self.max_button.clicked.connect(self._window.toggle_maximize_restore)
-
-        self.close_button = QPushButton("×")
-        self.close_button.setObjectName("TitleBarCloseButton")
-        self.close_button.setFixedSize(34, 24)
-        self.close_button.clicked.connect(self._window.close)
-
-        layout.addWidget(self.title_label)
-        layout.addStretch()
-        layout.addWidget(self.min_button)
-        layout.addWidget(self.max_button)
-        layout.addWidget(self.close_button)
-
-    def _start_system_move(self):
-        window_handle = self._window.windowHandle()
-        if not window_handle or not hasattr(window_handle, "startSystemMove"):
-            return False
-        try:
-            return bool(window_handle.startSystemMove())
-        except Exception:
-            return False
-
-    def mousePressEvent(self, event):
-        if event.button() != Qt.LeftButton:
-            super().mousePressEvent(event)
-            return
-        child = self.childAt(event.pos())
-        if isinstance(child, QPushButton):
-            super().mousePressEvent(event)
-            return
-
-        if os.name == "nt":
-                                                                               
-            self._start_system_move()
-            self._drag_active = False
-            event.accept()
-            return
-
-        if self._start_system_move():
-            self._drag_active = False
-            event.accept()
-            return
-
-        self._drag_active = True
-        self._drag_offset = event.globalPos() - self._window.frameGeometry().topLeft()
-        event.accept()
-
-    def mouseMoveEvent(self, event):
-        if not self._drag_active or not (event.buttons() & Qt.LeftButton):
-            super().mouseMoveEvent(event)
-            return
-
-        if self._window.isMaximized():
-            ratio = max(0.0, min(1.0, event.x() / max(1, self.width())))
-            self._window.showNormal()
-            target_x = event.globalX() - int(self._window.width() * ratio)
-            target_y = event.globalY() - 12
-            self._window.move(target_x, target_y)
-            self._drag_offset = QPoint(int(self._window.width() * ratio), 12)
-        else:
-            self._window.move(event.globalPos() - self._drag_offset)
-        event.accept()
-
-    def mouseReleaseEvent(self, event):
-        self._drag_active = False
-        super().mouseReleaseEvent(event)
-
-    def mouseDoubleClickEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            self._window.toggle_maximize_restore()
-            event.accept()
-            return
-        super().mouseDoubleClickEvent(event)
-
-
-class QuickStatsFloatingWindow(QWidget):
-    def __init__(self):
-        super().__init__(None)
-        self._drag_active = False
-        self._drag_offset = QPoint()
-        self.user_moved = False
-
-                                                                                                   
-        self.setWindowFlags(
-            Qt.Window
-            | Qt.FramelessWindowHint
-            | Qt.WindowStaysOnTopHint
-            | Qt.WindowDoesNotAcceptFocus
-        )
-        self.setAttribute(Qt.WA_TranslucentBackground, True)
-        self.setAttribute(Qt.WA_ShowWithoutActivating, True)
-        self.setFocusPolicy(Qt.NoFocus)
-        self.setObjectName("QuickStatsOverlay")
-        self.resize(250, 172)
-        self.setMinimumWidth(250)
-        if APP_ICON_FILE.exists():
-            self.setWindowIcon(QIcon(str(APP_ICON_FILE)))
-
-        root = QVBoxLayout(self)
-        root.setContentsMargins(0, 0, 0, 0)
-
-        self.panel = QFrame(self)
-        self.panel.setObjectName("QuickStatsPanel")
-        panel_layout = QVBoxLayout(self.panel)
-        panel_layout.setContentsMargins(14, 12, 14, 12)
-        panel_layout.setSpacing(6)
-
-        title = QLabel("Quick Stats")
-        title.setObjectName("QuickStatsTitle")
-
-        saved_label = QLabel("Saved Storage")
-        saved_label.setObjectName("QuickStatsLabel")
-        self.saved_value = QLabel("--")
-        self.saved_value.setObjectName("QuickStatsValue")
-
-        status_label = QLabel("Status")
-        status_label.setObjectName("QuickStatsLabel")
-        self.status_value = QLabel("Idle")
-        self.status_value.setObjectName("QuickStatsStatus")
-        self.status_value.setWordWrap(True)
-        self.suspended_header = QLabel("Suspended Utilities")
-        self.suspended_header.setObjectName("QuickStatsLabel")
-        self.suspended_list = QLabel("")
-        self.suspended_list.setObjectName("QuickStatsSuspendedList")
-        self.suspended_list.setWordWrap(True)
-        self.worker_header = QLabel("Workers")
-        self.worker_header.setObjectName("QuickStatsLabel")
-        self.worker_value = QLabel("")
-        self.worker_value.setObjectName("QuickStatsSuspendedList")
-        self.worker_header.hide()
-        self.worker_value.hide()
-        self.suspended_header.hide()
-        self.suspended_list.hide()
-
-        panel_layout.addWidget(title)
-        panel_layout.addWidget(saved_label)
-        panel_layout.addWidget(self.saved_value)
-        panel_layout.addWidget(status_label)
-        panel_layout.addWidget(self.status_value)
-        panel_layout.addWidget(self.suspended_header)
-        panel_layout.addWidget(self.suspended_list)
-        panel_layout.addWidget(self.worker_header)
-        panel_layout.addWidget(self.worker_value)
-        root.addWidget(self.panel)
-
-                                                                                          
-        for child in (
-            title,
-            saved_label,
-            self.saved_value,
-            status_label,
-            self.status_value,
-            self.suspended_header,
-            self.suspended_list,
-            self.worker_header,
-            self.worker_value,
-        ):
-            child.setAttribute(Qt.WA_TransparentForMouseEvents, True)
-
-        self.setStyleSheet(
-            """
-            #QuickStatsOverlay {
-                background: transparent;
-            }
-            #QuickStatsPanel {
-                background: rgba(9, 8, 14, 0.78);
-                border: 1px solid rgba(192, 113, 255, 0.55);
-                border-radius: 12px;
-            }
-            #QuickStatsTitle {
-                color: #FFFFFF;
-                font-size: 13px;
-                font-weight: 900;
-            }
-            #QuickStatsLabel {
-                color: #888899;
-                font-size: 11px;
-                font-weight: 800;
-            }
-            #QuickStatsValue {
-                color: #FFFFFF;
-                font-size: 12px;
-                font-weight: 900;
-            }
-            #QuickStatsStatus {
-                color: #C071FF;
-                font-size: 12px;
-                font-weight: 900;
-            }
-            #QuickStatsSuspendedList {
-                color: #FF6B8A;
-                font-size: 12px;
-                font-weight: 850;
-            }
-            """
-        )
-
-    def _try_start_system_move(self):
-        window_handle = self.windowHandle()
-        if not window_handle or not hasattr(window_handle, "startSystemMove"):
-            return False
-        try:
-            started = bool(window_handle.startSystemMove())
-            if started:
-                self.user_moved = True
-            return started
-        except Exception:
-            return False
-
-    def mousePressEvent(self, event):
-        if event.button() != Qt.LeftButton:
-            super().mousePressEvent(event)
-            return
-        if os.name == "nt":
-                                                                                
-            self._try_start_system_move()
-            event.accept()
-            return
-
-        if self._try_start_system_move():
-            event.accept()
-            return
-        self._drag_active = True
-        self._drag_offset = event.globalPos() - self.frameGeometry().topLeft()
-        event.accept()
-
-    def mouseMoveEvent(self, event):
-        if not self._drag_active or not (event.buttons() & Qt.LeftButton):
-            super().mouseMoveEvent(event)
-            return
-        self.move(event.globalPos() - self._drag_offset)
-        self.user_moved = True
-        event.accept()
-
-    def mouseReleaseEvent(self, event):
-        self._drag_active = False
-        super().mouseReleaseEvent(event)
-
-
-class XzenGameCompressor(QMainWindow):
-    def __init__(self):
-        super().__init__()
+        reset_logs()
+        log_action("debug", "main", "app_start", "Application log files reset for a fresh session.")
         self.games = []
         self.selected_index = None
         self.size_worker = None
@@ -568,7 +167,7 @@ class XzenGameCompressor(QMainWindow):
         self.update_dashboard()
 
     def apply_style(self):
-        self.setStyleSheet("""
+        self.setStyleSheet(themed_qss("""
             
             QMainWindow { background: #0B0A10; } 
             QWidget { 
@@ -865,7 +464,7 @@ class XzenGameCompressor(QMainWindow):
             #ViewModeButton { background: transparent; color: #777788; border: 1px solid #2B2640; border-radius: 8px; padding: 10px 12px; font-weight: 800; }
             #ViewModeButton:hover { background: #161422; color: #FFFFFF; border-color: #777788; }
             #ViewModeButton:checked { background: rgba(192, 113, 255, 0.15); color: #C071FF; border-color: #C071FF; }
-        """)
+        """))
 
     def build_dashboard_page(self):
         page = QWidget()
@@ -998,7 +597,7 @@ class XzenGameCompressor(QMainWindow):
         terminal_layout.setSpacing(8)
 
         self.dashboard_terminal_title = QLabel("Terminal")
-        self.dashboard_terminal_title.setStyleSheet("color: #00D4FF; font-weight: 800;")
+        self.dashboard_terminal_title.setStyleSheet(f"color: {theme_color('info')}; font-weight: 800;")
 
         self.dashboard_terminal_box = QTextEdit()
         self.dashboard_terminal_box.setReadOnly(True)
@@ -1037,7 +636,7 @@ class XzenGameCompressor(QMainWindow):
         left_layout.setSpacing(12)
 
         app_title = QLabel("X Z E N")
-        app_title.setStyleSheet("color: #FFFFFF; font-size: 20px; font-weight: 900; letter-spacing: 4px; margin-bottom: 20px;")
+        app_title.setStyleSheet(f"color: {theme_color('text')}; font-size: 20px; font-weight: 900; letter-spacing: 4px; margin-bottom: 20px;")
 
         left_title = QLabel("MENU")
         left_title.setObjectName("NavTitle")
@@ -1046,7 +645,7 @@ class XzenGameCompressor(QMainWindow):
         self.nav.setObjectName("PageNav")
         self.nav.setFocusPolicy(Qt.NoFocus)
         self.nav.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        for label in ("Dashboard", "Game Library", "FSR Mods", "Settings"):
+        for label in ("Dashboard", "Game Library", "Upscaler Mods", "Settings"):
             self.nav.addItem(QListWidgetItem(label))
         
         left_layout.addWidget(app_title)
@@ -1123,7 +722,7 @@ class XzenGameCompressor(QMainWindow):
         layout = QVBoxLayout(page)
         layout.setContentsMargins(24, 24, 24, 24)
         layout.addStretch()
-        label = QLabel("FSR Mods")
+        label = QLabel("Upscaler Mods")
         label.setObjectName("Title")
         label.setAlignment(Qt.AlignCenter)
         hint = QLabel("Loading when opened...")
@@ -1503,14 +1102,11 @@ class XzenGameCompressor(QMainWindow):
 
         total_saved = 0
         for game in self.games:
-            size = int(game.get("size", 0) or 0)
-            compressed_size = int(game.get("compressed_size", 0) or 0)
-            if compressed_size > 0 and size > compressed_size:
-                total_saved += size - compressed_size
+            total_saved += int(self.background_saved_bytes(game) or 0)
         self.quick_stats_window.saved_value.setText(format_game_size(total_saved))
 
         status_text = "Idle"
-        status_color = "#C071FF"
+        status_color = theme_color("accent")
         suspended_lines = []
         worker_lines = []
         if self.background_compress_active:
@@ -1525,14 +1121,14 @@ class XzenGameCompressor(QMainWindow):
             if getattr(self, "background_game_pause_active", False):
                 status_text = f"Game Detected | Background {action_text} Paused"
                 suspended_lines, worker_lines = self.compact_suspension_lines()
-                status_color = "#FF6B8A"
+                status_color = theme_color("danger_text")
             elif self.background_compress_paused:
                 status_text = f"Background {action_text} Paused"
                 suspended_lines, worker_lines = self.compact_suspension_lines()
-                status_color = "#FFD166"
+                status_color = theme_color("warning")
             else:
                 status_text = f"Background {action_text} Running"
-                status_color = "#C071FF"
+                status_color = theme_color("accent")
         elif self.busy and self.compact_worker:
             action_label = getattr(self.compact_worker, "action_label", "Working")
             game_name = "Current Selection"
@@ -1541,13 +1137,13 @@ class XzenGameCompressor(QMainWindow):
             if getattr(self, "foreground_pause_active", False):
                 status_text = f"Game Detected | {action_label} Paused"
                 suspended_lines, worker_lines = self.compact_suspension_lines()
-                status_color = "#FF6B8A"
+                status_color = theme_color("danger_text")
             else:
                 status_text = f"{action_label} {game_name}"
-                status_color = "#00D4FF"
+                status_color = theme_color("info")
         else:
             status_text = "System Online"
-            status_color = "#00E676"
+            status_color = theme_color("success")
 
         self.quick_stats_window.status_value.setText(status_text)
         self.quick_stats_window.status_value.setStyleSheet(
@@ -1738,6 +1334,15 @@ class XzenGameCompressor(QMainWindow):
             self.dashboard_terminal_box.append(line)
         if hasattr(self, "event_logger"):
             self.event_logger.info("ui_log", message=str(text))
+        lower = str(text).lower()
+        if any(token in lower for token in ("failed", "error", "exception", "could not", "invalid")):
+            log_error("main", "ui_log", str(text))
+        elif any(token in lower for token in ("warning", "skipped", "cancelled", "paused", "missing")):
+            log_warning("main", "ui_log", str(text))
+        elif any(token in lower for token in ("complete", "finished", "updated", "saved", "set:", "added", "removed")):
+            log_success("main", "ui_log", str(text))
+        else:
+            log_action("debug", "main", "ui_log", str(text))
 
     def retain_worker_until_finished(self, worker):
         if worker is None:
@@ -1876,11 +1481,10 @@ class XzenGameCompressor(QMainWindow):
         total_original = 0
         total_saved = 0
         for game in self.games:
-            size = int(game.get("size", 0) or 0)
-            compressed_size = int(game.get("compressed_size", 0) or 0)
-            if compressed_size > 0 and size > compressed_size:
-                total_original += size
-                total_saved += size - compressed_size
+            saved_bytes = int(self.background_saved_bytes(game) or 0)
+            if saved_bytes > 0:
+                total_original += int(state_original_game_size(game) or 0)
+                total_saved += saved_bytes
         if hasattr(self, "dashboard_gauge"):
             self.dashboard_gauge.set_values(total_saved, total_original)
         if hasattr(self, "dashboard_status"):
@@ -1894,24 +1498,24 @@ class XzenGameCompressor(QMainWindow):
                     action_text = "Cleanup"
                 if getattr(self, "background_game_pause_active", False):
                     self.dashboard_status.setText(f"● Game Detected - Background {action_text} Paused")
-                    self.dashboard_status.setStyleSheet("color: #FF6B8A; font-size: 13px; font-weight: 800; background: rgba(255, 107, 138, 0.14); padding: 6px 14px; border-radius: 12px;")
+                    self.dashboard_status.setStyleSheet(status_pill_style("danger_text", 0.14))
                 elif self.background_compress_paused:
                     self.dashboard_status.setText(f"● Background {action_text} Paused")
-                    self.dashboard_status.setStyleSheet("color: #FFD166; font-size: 13px; font-weight: 800; background: rgba(255, 209, 102, 0.12); padding: 6px 14px; border-radius: 12px;")
+                    self.dashboard_status.setStyleSheet(status_pill_style("warning", 0.12))
                 else:
                     self.dashboard_status.setText(f"● Background {action_text} Running")
-                    self.dashboard_status.setStyleSheet("color: #C071FF; font-size: 13px; font-weight: 800; background: rgba(192, 113, 255, 0.1); padding: 6px 14px; border-radius: 12px;")
+                    self.dashboard_status.setStyleSheet(status_pill_style("accent", 0.10))
             elif self.busy and self.compact_worker:
                 action_label = getattr(self.compact_worker, "action_label", "Working")
                 if getattr(self, "foreground_pause_active", False):
                     self.dashboard_status.setText(f"● Game Detected - {action_label} Paused")
-                    self.dashboard_status.setStyleSheet("color: #FF6B8A; font-size: 13px; font-weight: 800; background: rgba(255, 107, 138, 0.14); padding: 6px 14px; border-radius: 12px;")
+                    self.dashboard_status.setStyleSheet(status_pill_style("danger_text", 0.14))
                 else:
                     self.dashboard_status.setText(f"● {action_label}")
-                    self.dashboard_status.setStyleSheet("color: #00D4FF; font-size: 13px; font-weight: 800; background: rgba(0, 212, 255, 0.12); padding: 6px 14px; border-radius: 12px;")
+                    self.dashboard_status.setStyleSheet(status_pill_style("info", 0.12))
             else:
                 self.dashboard_status.setText("● System Online")
-                self.dashboard_status.setStyleSheet("color: #00E676; font-size: 13px; font-weight: 800; background: rgba(0, 230, 118, 0.1); padding: 6px 14px; border-radius: 12px;")
+                self.dashboard_status.setStyleSheet(status_pill_style("success", 0.10))
         if hasattr(self, "background_compress_btn"):
             self.update_background_controls()
         if hasattr(self, "quick_stats_window") and self.quick_stats_window.isVisible():
@@ -2183,6 +1787,9 @@ class XzenGameCompressor(QMainWindow):
     def background_saved_bytes(self, game):
         return state_background_saved_bytes(game)
 
+    def original_game_size(self, game):
+        return state_original_game_size(game)
+
     def background_is_game_checked(self, game):
         return state_background_is_game_checked(
             game,
@@ -2329,14 +1936,7 @@ class XzenGameCompressor(QMainWindow):
         decompress_checkbox_rows = []
 
         def game_original_size(game):
-            size = int(game.get("size", 0) or 0)
-            manifest_size = int(game.get("manifest_size", 0) or 0)
-            compressed_size = int(game.get("compressed_size", 0) or 0)
-
-                                                                             
-                                                                               
-                                                                   
-            return max(size, manifest_size, compressed_size)
+            return self.original_game_size(game)
 
         def game_source_size_text(game):
             size = game_original_size(game)
@@ -2745,29 +2345,36 @@ class XzenGameCompressor(QMainWindow):
             self.log("No games to fetch posters for.")
             return
 
-        missing_count = 0
-        for game in self.games:
+        poster_jobs = []
+        skipped_count = 0
+        for index, game in enumerate(self.games):
             poster_path = game.get("poster", "")
-            has_poster = bool(
-                poster_path
-                and os.path.exists(poster_path)
-                and is_portrait_poster_file(poster_path)
-            )
+            has_file = bool(poster_path and os.path.exists(poster_path))
+            has_poster = has_file and game.get("poster_status") in {"Ready", "Custom"}
+            if has_file and not has_poster:
+                has_poster = is_portrait_poster_file(poster_path)
 
             if game.get("name") and not has_poster:
                 game["poster"] = ""
                 game["poster_status"] = "Queued"
-                missing_count += 1
+                poster_job = dict(game)
+                poster_job["__poster_index"] = index
+                poster_jobs.append(poster_job)
+            elif has_poster:
+                skipped_count += 1
 
-        if not missing_count:
+        if not poster_jobs:
             self.log("All games already have cached posters.")
             return
 
-        self.log(f"Fetching posters for {missing_count} game(s) without valid vertical posters...")
+        self.log(
+            f"Fetching posters for {len(poster_jobs)} missing game(s); "
+            f"skipped {skipped_count} cached poster(s)."
+        )
 
         self.refresh_grid()
         self.begin_game_library_busy("poster_fetch", "Refreshing posters...")
-        self.poster_worker = PosterFetchWorker(self.games)
+        self.poster_worker = PosterFetchWorker(poster_jobs)
         self.poster_worker.log.connect(self.log)
         self.poster_worker.poster_done.connect(self.on_poster_done)
         self.poster_worker.finished_all.connect(self.on_poster_fetch_finished)
@@ -2814,6 +2421,14 @@ class XzenGameCompressor(QMainWindow):
         if 0 <= index < len(self.games):
             if self.games[index].get("source") == "Steam":
                 return
+            if self.is_game_compressed(self.games[index]):
+                original_size = max(int(self.games[index].get("original_size", 0) or 0), int(current_size or 0))
+                self.games[index]["original_size"] = original_size
+                self.games[index]["size"] = original_size
+                self.games[index]["file_count"] = file_count
+                self.games[index]["scan_progress"] = percent
+                self.games[index]["size_source"] = "Folder scan"
+                return
             self.games[index]["scan_progress"] = percent
             self.games[index]["status"] = "Scanning"
             self.games[index]["size"] = current_size
@@ -2823,6 +2438,23 @@ class XzenGameCompressor(QMainWindow):
 
     def on_size_done(self, index, size, file_count, size_source):
         if 0 <= index < len(self.games):
+            if self.is_game_compressed(self.games[index]):
+                original_size = max(
+                    int(self.games[index].get("original_size", 0) or 0),
+                    int(size or 0),
+                    int(self.games[index].get("manifest_size", 0) or 0),
+                    int(self.games[index].get("compressed_size", 0) or 0),
+                )
+                self.games[index]["original_size"] = original_size
+                self.games[index]["size"] = original_size
+                if size_source == "Steam manifest":
+                    self.games[index]["manifest_size"] = size
+                self.games[index]["file_count"] = file_count
+                self.games[index]["scan_progress"] = 100
+                self.games[index]["status"] = "Compressed"
+                self.games[index]["size_source"] = size_source
+                self.refresh_grid_throttled()
+                return
             if self.games[index].get("source") == "Steam" and size_source == "Steam manifest":
                 self.games[index]["manifest_size"] = size
                 self.games[index]["size"] = size
@@ -3124,11 +2756,14 @@ class XzenGameCompressor(QMainWindow):
             if ok:
                 self.games[index]["status"] = new_status
                 if new_status == "Compressed":
+                    original_size = self.original_game_size(self.games[index])
                     self.games[index]["compression_algorithm"] = algorithm
+                    self.games[index]["original_size"] = original_size
+                    self.games[index]["size"] = original_size
                     self.games[index]["compressed_size"] = compressed_size
                     self.games[index]["compressed_file_count"] = compressed_file_count
                     game_name = self.games[index].get("name", "Unknown")
-                    saved_amount = max(0, int(self.games[index].get("size", 0) or 0) - int(compressed_size or 0))
+                    saved_amount = self.background_saved_bytes(self.games[index])
                     self.log(
                         f"Task finished with {algorithm}. Saved: {format_game_size(saved_amount)}. "
                         f"Compressed size: {format_game_size(compressed_size)}"
@@ -3205,7 +2840,7 @@ class XzenGameCompressor(QMainWindow):
 if __name__ == "__main__":
     if os.name == "nt":
         try:
-            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("Xzen.GameCompressor.Higanbana")
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("Xzen.GameManager")
         except Exception:
             pass
 
@@ -3217,6 +2852,6 @@ if __name__ == "__main__":
     app.setQuitOnLastWindowClosed(True)
     if APP_ICON_FILE.exists():
         app.setWindowIcon(QIcon(str(APP_ICON_FILE)))
-    window = XzenGameCompressor()
+    window = XzenGameManager()
     window.show()
     sys.exit(app.exec_())
