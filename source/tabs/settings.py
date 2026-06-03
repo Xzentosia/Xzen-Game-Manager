@@ -24,9 +24,10 @@ from source.xzen_engine.constants import (
     estimated_cpu_core_count,
 )
 from source.tabs.game_library import PURPLE_SCROLLBAR_STYLE, SmoothScrollArea
+from source.xzen_engine.theme import themed_qss
 
 
-COMBO_VIEW_QSS = """
+COMBO_VIEW_QSS = themed_qss("""
     QListView {
         background-color: #0B0A10;
         border: 1px solid #2B2640;
@@ -47,10 +48,10 @@ COMBO_VIEW_QSS = """
         color: #ffffff;
         border: 1px solid rgba(192, 113, 255, 0.5);
     }
-"""
+""")
 
 
-SETTINGS_PAGE_QSS = """
+SETTINGS_PAGE_QSS = themed_qss("""
     #SettingsScroll {
         background: transparent;
         border: none;
@@ -220,7 +221,7 @@ SETTINGS_PAGE_QSS = """
         background: #171421;
         color: #ffffff;
     }
-"""
+""")
 
 
 class XGCRSettingsPage(QWidget):

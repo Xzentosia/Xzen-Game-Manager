@@ -17,6 +17,8 @@ from PyQt5.QtWidgets import (
 )
 
 from source.xzen_engine.posters import sanitize_png_file
+from source.xzen_engine.app_state import background_saved_bytes, original_game_size
+from source.xzen_engine.theme import color as theme_color, themed_qss
 
 
 MIN_CARD_W = 205
@@ -26,9 +28,9 @@ POSTER_W_PADDING = 30
 POSTER_ASPECT = 260 / 175
 GRID_SPACING = 12
 
-SCROLLBAR_ACCENT = "#B38AFF"
+SCROLLBAR_ACCENT = theme_color("accent_soft")
 
-PURPLE_SCROLLBAR_STYLE = f"""
+PURPLE_SCROLLBAR_STYLE = themed_qss(f"""
     QScrollBar:vertical {{
         background: #080808;
         width: 11px;
@@ -88,7 +90,7 @@ PURPLE_SCROLLBAR_STYLE = f"""
     QScrollBar::sub-page:horizontal {{
         background: transparent;
     }}
-"""
+""")
 
 
 class PosterLabel(QLabel):
@@ -223,7 +225,7 @@ class PosterCropCanvas(QWidget):
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
-        painter.fillRect(self.rect(), QColor("#08070D"))
+        painter.fillRect(self.rect(), QColor(theme_color("surface_deep")))
         rect = self.image_rect().toRect()
         painter.drawPixmap(rect, self.pixmap)
         frame = self.crop_frame()
@@ -232,7 +234,7 @@ class PosterCropCanvas(QWidget):
         painter.fillRect(QRectF(0, frame.bottom(), self.width(), self.height() - frame.bottom()), overlay)
         painter.fillRect(QRectF(0, frame.top(), frame.left(), frame.height()), overlay)
         painter.fillRect(QRectF(frame.right(), frame.top(), self.width() - frame.right(), frame.height()), overlay)
-        painter.setPen(QPen(QColor("#B38AFF"), 3))
+        painter.setPen(QPen(QColor(theme_color("accent_soft")), 3))
         painter.drawRoundedRect(frame, 10, 10)
         painter.setPen(QPen(QColor(255, 255, 255, 90), 1))
         for step in (1, 2):
@@ -249,7 +251,7 @@ class PosterCropDialog(QDialog):
         self.setModal(True)
         self.setMinimumSize(520, 720)
         self.source_pixmap = QPixmap(image_path)
-        self.setStyleSheet("""
+        self.setStyleSheet(themed_qss("""
             QDialog { background: #0B0A10; color: #ffffff; }
             QLabel#CropTitle { color: #ffffff; font-size: 22px; font-weight: 900; }
             QLabel#CropHint { color: #888899; font-size: 12px; font-weight: 700; }
@@ -262,7 +264,7 @@ class PosterCropDialog(QDialog):
             QPushButton:hover { background: #231E36; border-color: #B38AFF; }
             QPushButton#CropApply { background: #B38AFF; color: #08070D; border-color: #B38AFF; }
             QPushButton#CropApply:hover { background: #C8AAFF; }
-        """)
+        """))
         self.build_ui(game_name)
 
     def build_ui(self, game_name):
@@ -445,7 +447,7 @@ class GameCard(QFrame):
         self.name_label.setMaximumHeight(38)
 
         status = game.get("status", "Unknown")
-        size = game.get("size", 0)
+        size = original_game_size(game)
         compressed_size = int(game.get("compressed_size", 0) or 0)
 
         meta_text = f"{status} | {self.format_size(size)}"
@@ -500,7 +502,7 @@ class GameCard(QFrame):
 
         status = self.game.get("poster_status", "Queued")
         self.poster.setText(status if status else "No Poster")
-        self.poster.setStyleSheet("background: transparent; color:#ffffff; border:none;")
+        self.poster.setStyleSheet(themed_qss("background: transparent; color:#ffffff; border:none;"))
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -523,10 +525,11 @@ class GameRow(QFrame):
         self.setObjectName("GameCardSelected" if selected else "GameCard")
         self.setCursor(Qt.PointingHandCursor)
         self.setFixedHeight(76)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(12, 8, 12, 8)
-        layout.setSpacing(14)
+        layout.setSpacing(12)
 
         self.poster = PosterLabel()
         self.poster.setFixedSize(44, 58)
@@ -539,10 +542,11 @@ class GameRow(QFrame):
         self.name_label = QLabel(game.get("name", "Unknown"))
         self.name_label.setObjectName("RowName")
         self.name_label.setWordWrap(False)
-        self.name_label.setMinimumWidth(210)
+        self.name_label.setFixedWidth(210)
+        self.name_label.setToolTip(game.get("name", "Unknown"))
 
         status = game.get("status", "Unknown")
-        size = int(game.get("size", 0) or 0)
+        size = original_game_size(game)
         compressed_size = int(game.get("compressed_size", 0) or 0)
         size_text = f"Size: {self.format_size(size)}"
         if compressed_size > 0:
@@ -551,10 +555,12 @@ class GameRow(QFrame):
         self.meta_label = QLabel(f"{status} | {size_text}")
         self.meta_label.setObjectName("RowMeta")
         self.meta_label.setWordWrap(False)
+        self.meta_label.setFixedWidth(255)
 
-        saved_amount = max(0, size - compressed_size) if compressed_size > 0 else 0
+        saved_amount = background_saved_bytes(game) if compressed_size > 0 else 0
         self.saved_label = QLabel(f"Saved: {self.format_size(saved_amount)}")
         self.saved_label.setObjectName("RowSavedMeta")
+        self.saved_label.setFixedWidth(118)
 
         self.action_btn = QPushButton(action_text)
         self.action_btn.setObjectName("CardActionButton")
@@ -565,10 +571,10 @@ class GameRow(QFrame):
         self.action_btn.clicked.connect(lambda: self.action_clicked.emit(self.index))
 
         layout.addWidget(self.poster)
-        layout.addWidget(self.name_label, stretch=2)
-        layout.addWidget(self.meta_label, stretch=3)
-        layout.addWidget(self.saved_label, stretch=1)
-        layout.addStretch()
+        layout.addWidget(self.name_label)
+        layout.addWidget(self.meta_label)
+        layout.addWidget(self.saved_label)
+        layout.addStretch(1)
         layout.addWidget(self.action_btn)
 
     def load_poster(self):
@@ -585,7 +591,7 @@ class GameRow(QFrame):
 
         status = self.game.get("poster_status", "No Poster")
         self.poster.setText(status if status else "No Poster")
-        self.poster.setStyleSheet("background: transparent; color:#ffffff; border:none;")
+        self.poster.setStyleSheet(themed_qss("background: transparent; color:#ffffff; border:none;"))
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -736,7 +742,7 @@ class XGCRGameLibraryPage(QWidget):
         self.busy_overlay.setObjectName("GameLibraryBusyOverlay")
         self.busy_overlay.setAttribute(Qt.WA_StyledBackground, True)
         self.busy_overlay.setStyleSheet(
-            """
+            themed_qss("""
             #GameLibraryBusyOverlay {
                 background: rgba(8, 7, 14, 174);
                 border: 1px solid rgba(179, 138, 255, 0.22);
@@ -748,7 +754,7 @@ class XGCRGameLibraryPage(QWidget):
                 font-weight: 900;
                 background: transparent;
             }
-            """
+            """)
         )
         self.busy_overlay.hide()
 
@@ -842,11 +848,15 @@ class XGCRGameLibraryPage(QWidget):
             card.clicked.connect(self.game_selected.emit)
             card.action_clicked.connect(self.game_action_requested.emit)
             card.poster_context_requested.connect(self.custom_poster_requested.emit)
-            self.grid_layout.addWidget(card, row, col, Qt.AlignTop | Qt.AlignLeft)
+            alignment = Qt.AlignTop if self.view_mode == "rows" else Qt.AlignTop | Qt.AlignLeft
+            self.grid_layout.addWidget(card, row, col, alignment)
 
         for col_index in range(max(1, columns + 1)):
             self.grid_layout.setColumnStretch(col_index, 0)
-        self.grid_layout.setColumnStretch(columns, 1)
+        if self.view_mode == "rows":
+            self.grid_layout.setColumnStretch(0, 1)
+        else:
+            self.grid_layout.setColumnStretch(columns, 1)
         self.grid_layout.setRowStretch((len(self.current_games) // columns) + 1, 1)
         self.schedule_grid_reflow()
 
