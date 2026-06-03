@@ -273,4 +273,4 @@ FSR replacement is separate from NTFS compression. Compression uses Windows file
 Some features may change, and store scanning may improve over time.
 FSR Implementation for games are still in early development. ```The FSR Versions are modified FSR INT8 .dll's``` that means it supports older cards like RX6000 Series
 
-Required Notice: Copyright (c) 2026 LXRylex (https://github.com/LXRylex)
+Required Notice: Copyright (c) 2026 LXRylex and Xzentosia (https://github.com/LXRylex, https://github.com/Xzentosia)
