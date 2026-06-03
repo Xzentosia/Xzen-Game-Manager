@@ -1,0 +1,42 @@
+{"action": "app_start", "area": "main", "context": {}, "level": "debug", "message": "Application log files reset for a fresh session.", "timestamp": "2026-06-03T04:17:35+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "warning", "message": "Startup scan skipped. Use Scan Stores to refresh games.", "timestamp": "2026-06-03T04:17:36+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "debug", "message": "Size scan: preparing...", "timestamp": "2026-06-03T04:17:40+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "debug", "message": "Size scan started...", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "debug", "message": "Checking 1/19: OVR Advanced Settings", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "debug", "message": "Using Steam installed manifest size for OVR Advanced Settings: 75.51 MB", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "debug", "message": "Checking 2/19: Kill or Love", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "debug", "message": "Using Steam installed manifest size for Kill or Love: 277.98 MB", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "debug", "message": "Checking 3/19: SMASH LEGENDS", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "debug", "message": "Using Steam installed manifest size for SMASH LEGENDS: 2.85 GB", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "debug", "message": "Checking 4/19: The Coffin of Andy and Leyley", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "debug", "message": "Using Steam installed manifest size for The Coffin of Andy and Leyley: 710.30 MB", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "debug", "message": "Checking 5/19: SteamVR", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "debug", "message": "Using Steam installed manifest size for SteamVR: 5.40 GB", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "debug", "message": "Checking 6/19: OyasumiVR", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "debug", "message": "Using Steam installed manifest size for OyasumiVR: 587.78 MB", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "debug", "message": "Checking 7/19: Yuki「清醒梦」", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "debug", "message": "Using Steam installed manifest size for Yuki「清醒梦」: 898.10 MB", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "debug", "message": "Checking 8/19: Wallpaper Engine", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "debug", "message": "Using Steam installed manifest size for Wallpaper Engine: 790.61 MB", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "debug", "message": "Checking 9/19: VRChat", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "debug", "message": "Using Steam installed manifest size for VRChat: 1.02 GB", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "debug", "message": "Checking 10/19: Lossless Scaling", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "debug", "message": "Using Steam installed manifest size for Lossless Scaling: 175.29 MB", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "debug", "message": "Checking 11/19: Euro Truck Simulator 2", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "debug", "message": "Using Steam installed manifest size for Euro Truck Simulator 2: 34.72 GB", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "debug", "message": "Checking 12/19: Forza Horizon 6", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "debug", "message": "Using Steam installed manifest size for Forza Horizon 6: 155.65 GB", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "debug", "message": "Checking 13/19: Dead Cells", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "debug", "message": "Checking 14/19: Minecraft Launcher", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "debug", "message": "Checking 15/19: League of Legends", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "debug", "message": "Checking 16/19: VALORANT", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "debug", "message": "Checking 17/19: Hades", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "debug", "message": "Checking 18/19: The Isle", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "debug", "message": "Using Steam installed manifest size for The Isle: 8.40 GB", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "debug", "message": "Checking 19/19: ShareX", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "debug", "message": "Using Steam installed manifest size for ShareX: 478.72 MB", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "success", "message": "Size scan finished.", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "success", "message": "Size scan: complete", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "debug", "message": "Starting compact compress using LZX. Using 7 worker(s) from settings, CPU threads available: 12 [mode=custom, custom=7]: c:\\program files (x86)\\steam\\steamapps\\common\\The Coffin of Andy and Leyley", "timestamp": "2026-06-03T04:17:44+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "debug", "message": "Smart gaming pause enabled. Pauses compact.exe while gaming and resumes after 45s PC idle.", "timestamp": "2026-06-03T04:17:44+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "success", "message": "Task finished with LZX. Saved: 108.37 MB. Compressed size: 601.93 MB", "timestamp": "2026-06-03T04:17:58+03:00"}

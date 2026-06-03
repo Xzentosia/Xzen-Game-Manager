@@ -1,0 +1,3 @@
+{"action": "ui_log", "area": "main", "context": {}, "level": "success", "message": "Size scan finished.", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "success", "message": "Size scan: complete", "timestamp": "2026-06-03T04:17:41+03:00"}
+{"action": "ui_log", "area": "main", "context": {}, "level": "success", "message": "Task finished with LZX. Saved: 108.37 MB. Compressed size: 601.93 MB", "timestamp": "2026-06-03T04:17:58+03:00"}
