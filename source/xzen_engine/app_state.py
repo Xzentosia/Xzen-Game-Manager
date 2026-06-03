@@ -49,6 +49,7 @@ if PYDANTIC_AVAILABLE:
         poster: str = ""
         poster_status: str = "Queued"
         size: int = 0
+        original_size: int = 0
         manifest_size: int = 0
         compressed_size: int = 0
         compressed_file_count: int = 0
@@ -142,6 +143,7 @@ def normalize_game_entry(game):
     normalized.setdefault("poster_status", "Queued" if not normalized.get("poster") else "Ready")
     normalized.setdefault("file_count", 0)
     normalized.setdefault("size", 0)
+    normalized.setdefault("original_size", 0)
     normalized.setdefault("manifest_size", 0)
     normalized.setdefault("compressed_size", 0)
     normalized.setdefault("compressed_file_count", 0)
@@ -152,6 +154,31 @@ def normalize_game_entry(game):
     normalized.setdefault("size_source", "Unknown")
     if int(normalized.get("compressed_size", 0) or 0) < 0:
         normalized["compressed_size"] = 0
+    for key in ("size", "original_size", "manifest_size", "compressed_size"):
+        try:
+            normalized[key] = max(0, int(normalized.get(key, 0) or 0))
+        except Exception:
+            normalized[key] = 0
+
+    compressed_size = int(normalized.get("compressed_size", 0) or 0)
+    size = int(normalized.get("size", 0) or 0)
+    original_size = int(normalized.get("original_size", 0) or 0)
+    manifest_size = int(normalized.get("manifest_size", 0) or 0)
+    compressed_hint = (
+        normalized.get("status") == "Compressed"
+        or compressed_size > 0
+        or int(normalized.get("compressed_file_count", 0) or 0) > 0
+        or bool(normalized.get("compression_algorithm", ""))
+    )
+    if compressed_hint and compressed_size > 0:
+        if size > 0 and compressed_size > size:
+            normalized["original_size"] = max(original_size, manifest_size, compressed_size)
+            normalized["compressed_size"] = size
+            normalized["size"] = max(normalized["original_size"], manifest_size)
+        elif original_size <= 0:
+            normalized["original_size"] = max(size, manifest_size, compressed_size)
+        else:
+            normalized["original_size"] = max(original_size, manifest_size, compressed_size)
 
     if PYDANTIC_AVAILABLE:
         try:
@@ -226,7 +253,7 @@ def _merge_game_entries(base, incoming):
         merged["exe_path"] = incoming_norm.get("exe_path")
 
                                           
-    for key in ("size", "manifest_size", "compressed_size", "compressed_file_count", "file_count", "scan_progress"):
+    for key in ("size", "original_size", "manifest_size", "compressed_size", "compressed_file_count", "file_count", "scan_progress"):
         merged[key] = max(int(merged.get(key, 0) or 0), int(incoming_norm.get(key, 0) or 0))
 
     if not merged.get("poster") and incoming_norm.get("poster"):
@@ -310,6 +337,16 @@ def is_game_compressed(game):
     )
 
 
+def original_game_size(game):
+    size = int(game.get("size", 0) or 0)
+    original_size = int(game.get("original_size", 0) or 0)
+    manifest_size = int(game.get("manifest_size", 0) or 0)
+    compressed_size = int(game.get("compressed_size", 0) or 0)
+    if is_game_compressed(game):
+        return max(original_size, size, manifest_size, compressed_size)
+    return max(size, manifest_size, original_size)
+
+
 def background_game_key(game):
     path = game.get("path", "")
     if not path:
@@ -318,7 +355,7 @@ def background_game_key(game):
 
 
 def background_saved_bytes(game):
-    size = int(game.get("size", 0) or game.get("manifest_size", 0) or 0)
+    size = original_game_size(game)
     compressed_size = int(game.get("compressed_size", 0) or 0)
     if size <= 0 or compressed_size <= 0:
         return 0

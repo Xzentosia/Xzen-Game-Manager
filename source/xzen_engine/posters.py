@@ -3,16 +3,25 @@
 import re
 import shutil
 import struct
+from pathlib import Path
 from urllib.parse import quote
 
 import requests
+from PyQt5.QtCore import QRect
+from PyQt5.QtGui import QColor, QImage, QPainter
 
 from .constants import POSTER_CACHE_DIR, STEAMGRIDDB_API_KEY
+from .steam import find_steam_libraries, get_steam_path
 
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 PNG_COLOR_CHUNKS = {b"cHRM", b"gAMA", b"iCCP", b"sRGB"}
 MIN_POSTER_RATIO = 0.55
 MAX_POSTER_RATIO = 0.78
+KNOWN_STEAM_APPIDS_BY_NAME = {
+    "yuki": "3909220",
+    "yuki「清醒夢」": "3909220",
+    "yuki「清醒梦」": "3909220",
+}
 
 
 def strip_png_color_chunks(data):
@@ -191,27 +200,81 @@ def cache_local_poster(path, target_base):
         return path
 
 
-def find_local_steam_poster(steam_path, appid):
-    if not steam_path or not appid:
+def steam_poster_cache_dirs(steam_path="", install_path=""):
+    roots = []
+
+    def add_root(path):
+        if not path:
+            return
+        try:
+            root = Path(path).expanduser().resolve()
+        except Exception:
+            return
+        if root.exists() and str(root).lower() not in [str(item).lower() for item in roots]:
+            roots.append(root)
+
+    add_root(steam_path)
+    add_root(get_steam_path())
+
+    try:
+        libraries, detected_steam_path = find_steam_libraries()
+        add_root(detected_steam_path)
+        for steamapps in libraries:
+            add_root(Path(steamapps).parent)
+    except Exception:
+        pass
+
+    if install_path:
+        try:
+            path = Path(install_path).expanduser().resolve()
+            for parent in [path] + list(path.parents):
+                if parent.name.lower() == "steamapps":
+                    add_root(parent.parent)
+                if parent.name.lower() == "common" and parent.parent.name.lower() == "steamapps":
+                    add_root(parent.parent.parent)
+        except Exception:
+            pass
+
+    caches = []
+    for root in roots:
+        for candidate in (
+            root / "appcache" / "librarycache",
+            root / "steamapps" / "appcache" / "librarycache",
+        ):
+            if candidate.exists() and str(candidate).lower() not in [str(item).lower() for item in caches]:
+                caches.append(candidate)
+    return caches
+
+
+def find_local_steam_poster(steam_path, appid, install_path=""):
+    if not appid:
         return ""
 
-    cache = os.path.join(steam_path, "appcache", "librarycache")
     names = [
         f"{appid}_library_600x900.jpg", f"{appid}_library_600x900.png", f"{appid}_library_600x900.webp",
     ]
 
-    for name in names:
-        path = os.path.join(cache, name)
-        if os.path.exists(path) and is_portrait_poster_file(path):
-            return path
+    for cache in steam_poster_cache_dirs(steam_path, install_path):
+        search_dirs = [(cache, False), (cache / str(appid), True)]
+        for search_dir, appid_scoped in search_dirs:
+            if not search_dir.exists():
+                continue
 
-    if os.path.exists(cache):
-        for file in os.listdir(cache):
-            lower = file.lower()
-            if lower.startswith(str(appid).lower()) and lower.endswith((".jpg", ".jpeg", ".png", ".webp")):
-                path = os.path.join(cache, file)
-                if is_portrait_poster_file(path):
-                    return path
+            for name in names:
+                path = search_dir / name
+                if path.exists() and is_portrait_poster_file(path):
+                    local_prefix = os.path.join(POSTER_CACHE_DIR, f"{appid}_steam_local")
+                    return cache_local_poster(str(path), local_prefix)
+
+            for file in os.listdir(search_dir):
+                lower = file.lower()
+                is_image = lower.endswith((".jpg", ".jpeg", ".png", ".webp"))
+                belongs_to_app = appid_scoped or lower.startswith(str(appid).lower())
+                if is_image and belongs_to_app:
+                    path = search_dir / file
+                    if path.is_file() and is_portrait_poster_file(path):
+                        local_prefix = os.path.join(POSTER_CACHE_DIR, f"{appid}_steam_local")
+                        return cache_local_poster(str(path), local_prefix)
 
     return ""
 
@@ -237,13 +300,13 @@ def image_extension_from_response(url, response):
     return ".jpg"
 
 
-def download_image(url, target_base, auth_key=None):
-    headers = {"User-Agent": "Mozilla/5.0 XzenGameCompressor/1.0"}
+def download_image(url, target_base, auth_key=None, timeout=12):
+    headers = {"User-Agent": "Mozilla/5.0 XzenGameManager/1.0"}
     if auth_key:
         headers["Authorization"] = f"Bearer {auth_key}"
 
     try:
-        response = requests.get(url, headers=headers, timeout=20)
+        response = requests.get(url, headers=headers, timeout=timeout)
         if response.status_code == 200 and len(response.content) > 1000:
             ext = image_extension_from_response(url, response)
             target = target_base + ext
@@ -265,7 +328,7 @@ def download_image(url, target_base, auth_key=None):
 
 
 def download_file(url, target, auth_key=None):
-    headers = {"User-Agent": "Mozilla/5.0 XzenGameCompressor/1.0"}
+    headers = {"User-Agent": "Mozilla/5.0 XzenGameManager/1.0"}
     if auth_key:
         headers["Authorization"] = f"Bearer {auth_key}"
 
@@ -292,6 +355,47 @@ def cached_image_for_prefix(prefix):
     return ""
 
 
+def draw_scaled_image(painter, image, target_rect, cover=True):
+    source_width = image.width()
+    source_height = image.height()
+    if source_width <= 0 or source_height <= 0:
+        return
+
+    scale = max(target_rect.width() / source_width, target_rect.height() / source_height)
+    if not cover:
+        scale = min(target_rect.width() / source_width, target_rect.height() / source_height)
+
+    width = int(source_width * scale)
+    height = int(source_height * scale)
+    x = target_rect.x() + (target_rect.width() - width) // 2
+    y = target_rect.y() + (target_rect.height() - height) // 2
+    painter.drawImage(QRect(x, y, width, height), image)
+
+
+def build_vertical_store_poster(image_data, target):
+    image = QImage.fromData(image_data)
+    if image.isNull():
+        return ""
+
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+    canvas = QImage(600, 900, QImage.Format_RGB32)
+    canvas.fill(QColor("#0B0A10"))
+
+    painter = QPainter(canvas)
+    painter.setRenderHint(QPainter.SmoothPixmapTransform, True)
+
+    painter.setOpacity(0.45)
+    draw_scaled_image(painter, image, QRect(0, 0, 600, 900), cover=True)
+
+    painter.setOpacity(1.0)
+    draw_scaled_image(painter, image, QRect(28, 238, 544, 424), cover=False)
+    painter.end()
+
+    if canvas.save(target, "PNG") and is_portrait_poster_file(target):
+        return target
+    return ""
+
+
 def safe_cache_name(value):
     value = str(value or "").strip().lower()
     value = re.sub(r"[^a-z0-9._-]+", "_", value)
@@ -304,6 +408,7 @@ def poster_query_variants(name):
         return []
 
     variants = []
+    cjk_title_map = str.maketrans({"夢": "梦", "梦": "夢"})
 
     def add(value):
         value = re.sub(r"\s+", " ", str(value or "")).strip(" -_:")
@@ -313,16 +418,31 @@ def poster_query_variants(name):
     add(raw)
     add(re.sub(r"[™®©]", "", raw))
     add(re.sub(r"\([^)]*\)|\[[^]]*\]", " ", raw))
+    add(re.sub(r"[「『【《（(].*?[」』】》）)]", " ", raw))
     add(re.split(r"\s*[:|-]\s*", raw, maxsplit=1)[0])
     add(re.sub(r"\b(launcher|content|edition|deluxe|ultimate|standard|complete|definitive|bundle|dlc)\b", " ", raw, flags=re.IGNORECASE))
+    ascii_prefix = re.split(r"[^A-Za-z0-9]+", raw, maxsplit=1)[0]
+    if len(ascii_prefix) >= 3:
+        add(ascii_prefix)
     without_stay_human = re.sub(r"\bstay human\b", "", raw, flags=re.IGNORECASE)
     add(without_stay_human)
     add(re.split(r"\s*[:|-]\s*", without_stay_human, maxsplit=1)[0])
+    for variant in list(variants):
+        add(variant.translate(cjk_title_map))
 
     if "minecraft" in raw.lower():
         add("Minecraft")
 
-    return variants[:8]
+    return variants[:12]
+
+
+def known_steam_appid_for_name(name):
+    normalized = re.sub(r"\s+", " ", str(name or "").strip().lower())
+    if normalized in KNOWN_STEAM_APPIDS_BY_NAME:
+        return KNOWN_STEAM_APPIDS_BY_NAME[normalized]
+    if normalized.startswith("yuki") and ("清醒" in normalized or "yuki" == normalized):
+        return "3909220"
+    return ""
 
 
 def poster_score(item):
@@ -369,7 +489,7 @@ def fetch_steamgriddb_poster(appid):
         "&humor=false"
     )
     headers = {
-        "User-Agent": "Mozilla/5.0 XzenGameCompressor/1.0",
+        "User-Agent": "Mozilla/5.0 XzenGameManager/1.0",
         "Authorization": f"Bearer {STEAMGRIDDB_API_KEY}",
     }
 
@@ -402,7 +522,7 @@ def fetch_steamgriddb_poster_by_query(query, source="", cache_label=""):
         return cached
 
     headers = {
-        "User-Agent": "Mozilla/5.0 XzenGameCompressor/1.0",
+        "User-Agent": "Mozilla/5.0 XzenGameManager/1.0",
         "Authorization": f"Bearer {STEAMGRIDDB_API_KEY}",
     }
 
@@ -454,7 +574,7 @@ def fetch_steam_appid_by_name(name):
     for query in poster_query_variants(name):
         try:
             url = f"https://store.steampowered.com/api/storesearch/?term={quote(query)}&cc=us&l=en"
-            response = requests.get(url, headers={"User-Agent": "Mozilla/5.0 XzenGameCompressor/1.0"}, timeout=12)
+            response = requests.get(url, headers={"User-Agent": "Mozilla/5.0 XzenGameManager/1.0"}, timeout=12)
             if response.status_code != 200:
                 continue
 
@@ -478,10 +598,31 @@ def fetch_steam_appid_by_name(name):
     return ""
 
 
-def fetch_store_api_image(appid, target_base):
+def fetch_steam_app_name(appid):
+    appid = str(appid or "").strip()
+    if not appid:
+        return ""
     try:
         url = f"https://store.steampowered.com/api/appdetails?appids={appid}&filters=basic"
-        response = requests.get(url, headers={"User-Agent": "Mozilla/5.0 XzenGameCompressor/1.0"}, timeout=12)
+        response = requests.get(url, headers={"User-Agent": "Mozilla/5.0 XzenGameManager/1.0"}, timeout=12)
+        if response.status_code != 200:
+            return ""
+        entry = response.json().get(str(appid), {})
+        if not entry.get("success"):
+            return ""
+        return str(entry.get("data", {}).get("name", "") or "").strip()
+    except Exception:
+        return ""
+
+
+def fetch_store_api_image(appid, target_base):
+    cached = cached_image_for_prefix(target_base)
+    if cached:
+        return cached
+
+    try:
+        url = f"https://store.steampowered.com/api/appdetails?appids={appid}&filters=basic"
+        response = requests.get(url, headers={"User-Agent": "Mozilla/5.0 XzenGameManager/1.0"}, timeout=12)
         if response.status_code != 200:
             return ""
 
@@ -491,9 +632,16 @@ def fetch_store_api_image(appid, target_base):
             return ""
 
         info = entry.get("data", {})
-        for image_url in [info.get("capsule_imagev5", ""), info.get("header_image", ""), info.get("capsule_image", "")]:
-            if image_url:
-                result = download_image(image_url, target_base)
+        for image_url in [info.get("header_image", ""), info.get("capsule_imagev5", ""), info.get("capsule_image", "")]:
+            if not image_url:
+                continue
+            image_response = requests.get(
+                image_url,
+                headers={"User-Agent": "Mozilla/5.0 XzenGameManager/1.0"},
+                timeout=8,
+            )
+            if image_response.status_code == 200 and len(image_response.content) > 1000:
+                result = build_vertical_store_poster(image_response.content, target_base + ".png")
                 if result:
                     return result
     except Exception:
@@ -514,8 +662,13 @@ def download_steam_poster(appid):
 
     urls = [
         f"https://cdn.cloudflare.steamstatic.com/steam/apps/{appid}/library_600x900.jpg",
+        f"https://cdn.cloudflare.steamstatic.com/steam/apps/{appid}/library_600x900_2x.jpg",
         f"https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/{appid}/library_600x900.jpg",
+        f"https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/{appid}/library_600x900_2x.jpg",
+        f"https://shared.steamstatic.com/store_item_assets/steam/apps/{appid}/library_600x900.jpg",
+        f"https://shared.steamstatic.com/store_item_assets/steam/apps/{appid}/library_600x900_2x.jpg",
         f"https://steamcdn-a.akamaihd.net/steam/apps/{appid}/library_600x900.jpg",
+        f"https://steamcdn-a.akamaihd.net/steam/apps/{appid}/library_600x900_2x.jpg",
     ]
 
     for url in urls:
@@ -526,23 +679,34 @@ def download_steam_poster(appid):
     return ""
 
 
-def get_poster_for_game(steam_path, appid, name="", source=""):
+def get_poster_for_game(steam_path, appid, name="", source="", install_path=""):
     appid = str(appid or "").strip()
     source = str(source or "").strip()
+    if not appid:
+        appid = known_steam_appid_for_name(name)
 
     if appid and (source == "Steam" or appid.isdigit()):
+        local = find_local_steam_poster(steam_path, appid, install_path)
+        if local:
+            return local
+
         sgdb = fetch_steamgriddb_poster(appid)
         if sgdb:
             return sgdb
 
-        local = find_local_steam_poster(steam_path, appid)
-        if local:
-            local_prefix = os.path.join(POSTER_CACHE_DIR, f"{appid}_steam_local")
-            return cache_local_poster(local, local_prefix)
-
         steam_poster = download_steam_poster(appid)
         if steam_poster:
             return steam_poster
+
+        store_image = fetch_store_api_image(appid, os.path.join(POSTER_CACHE_DIR, f"{appid}_store_fallback"))
+        if store_image:
+            return store_image
+
+        steam_name = fetch_steam_app_name(appid)
+        if steam_name and steam_name.strip().lower() != str(name or "").strip().lower():
+            sgdb_by_steam_name = fetch_steamgriddb_poster_by_name(steam_name, source)
+            if sgdb_by_steam_name:
+                return sgdb_by_steam_name
 
     sgdb = fetch_steamgriddb_poster_by_name(name, source)
     if sgdb:
@@ -550,7 +714,13 @@ def get_poster_for_game(steam_path, appid, name="", source=""):
 
     steam_appid = fetch_steam_appid_by_name(name)
     if steam_appid:
-        return download_steam_poster(steam_appid)
+        local = find_local_steam_poster(steam_path, steam_appid, install_path)
+        if local:
+            return local
+        steam_poster = download_steam_poster(steam_appid)
+        if steam_poster:
+            return steam_poster
+        return fetch_store_api_image(steam_appid, os.path.join(POSTER_CACHE_DIR, f"{steam_appid}_store_fallback"))
 
     return ""
 

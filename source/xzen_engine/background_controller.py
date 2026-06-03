@@ -11,6 +11,7 @@ from .constants import (
 )
 from .deps import StateMachine, get_logger, has_transitions
 from .formatting import format_game_size
+from .app_state import background_saved_bytes, original_game_size
 from .workers import CompactWorker
 
 LOGGER = get_logger(__name__)
@@ -226,12 +227,15 @@ class BackgroundRunController:
             h.compact_worker and getattr(h.compact_worker, "cancel_cleanup_requested", False)
         )
         if ok and 0 <= index < len(h.games):
+            original_size = original_game_size(h.games[index])
             h.games[index]["status"] = "Compressed"
             h.games[index]["compression_algorithm"] = algorithm
+            h.games[index]["original_size"] = original_size
+            h.games[index]["size"] = original_size
             h.games[index]["compressed_size"] = compressed_size
             h.games[index]["compressed_file_count"] = compressed_file_count
             game_name = h.games[index].get("name", "Unknown")
-            saved_amount = max(0, int(h.games[index].get("size", 0) or 0) - int(compressed_size or 0))
+            saved_amount = background_saved_bytes(h.games[index])
             h.log(
                 f"Background compressed {game_name} with {algorithm}. "
                 f"Saved: {format_game_size(saved_amount)}."
@@ -269,7 +273,7 @@ class BackgroundRunController:
             game_name = h.games[index].get("name", "Unknown")
             previous_saved_amount = max(
                 0,
-                int(h.games[index].get("size", 0) or 0) - int(h.games[index].get("compressed_size", 0) or 0),
+                background_saved_bytes(h.games[index]),
             )
             h.games[index]["status"] = "Normal"
             h.games[index]["compression_algorithm"] = ""

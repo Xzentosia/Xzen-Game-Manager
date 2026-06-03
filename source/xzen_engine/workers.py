@@ -62,19 +62,26 @@ class PosterFetchWorker(QThread):
         self.cancel_requested = True
 
     def fetch_one(self, index, game, steam_path):
-        poster_key = game.get("appid") or game.get("path", "") or str(index)
+        result_index = int(game.get("__poster_index", index))
+        poster_key = game.get("appid") or game.get("path", "") or str(result_index)
         if self.cancel_requested:
-            return index, poster_key, ""
+            return result_index, poster_key, "", game.get("name", "Unknown")
 
         appid = game.get("appid", "")
         name = game.get("name", "Unknown")
 
         self.log.emit(f"Fetching best poster: {name}")
-        poster = get_poster_for_game(steam_path, appid, name, game.get("source", ""))
+        poster = get_poster_for_game(
+            steam_path,
+            appid,
+            name,
+            game.get("source", ""),
+            game.get("path", "") or game.get("install_dir", ""),
+        )
         if poster and os.path.exists(poster):
-            return index, poster_key, poster
+            return result_index, poster_key, poster, name
 
-        return index, poster_key, ""
+        return result_index, poster_key, "", name
 
     def run(self):
         steam_path = get_steam_path()
@@ -105,14 +112,10 @@ class PosterFetchWorker(QThread):
                     break
 
                 try:
-                    index, appid, poster = future.result()
+                    index, appid, poster, name = future.result()
                 except Exception as e:
                     self.log.emit(f"Poster fetch failed: {e}")
                     continue
-
-                name = "Unknown"
-                if 0 <= index < len(self.games):
-                    name = self.games[index].get("name", "Unknown")
 
                 if poster:
                     self.poster_done.emit(index, appid, poster)

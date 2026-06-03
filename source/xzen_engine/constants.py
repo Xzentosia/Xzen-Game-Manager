@@ -20,14 +20,14 @@ if not SOURCE_DIR.exists() and getattr(sys, "frozen", False):
 if os.name == "nt":
     fallback_settings_root = Path(
         os.environ.get("LOCALAPPDATA") or (Path.home() / "AppData" / "Local")
-    ) / "Xzen" / "XzenGameCompressor"
+    ) / "Xzen" / "XzenGameManager"
 else:
     fallback_settings_root = Path(
         os.environ.get("XDG_DATA_HOME") or (Path.home() / ".local" / "share")
-    ) / "XzenGameCompressor"
+    ) / "XzenGameManager"
 
 PLATFORM_USER_SETTINGS_DIR = user_data_path(
-    app_name="XzenGameCompressor",
+    app_name="XzenGameManager",
     app_author="Xzen",
     fallback_path=fallback_settings_root,
 ) / "user_settings"
@@ -40,7 +40,7 @@ FSR_BACKUP_DIR = USER_SETTINGS_DIR / "fsr_backups"
 ASSETS_DIR = SOURCE_DIR / "assets"
 APP_ICON_FILE = ASSETS_DIR / "xzen.ico"
 
-APP_NAME = "Xzen Game Compressor - HIGANBANA"
+APP_NAME = "Xzen Game Manager"
 DATA_FILE = str(USER_SETTINGS_DIR / "xzen_games.json")
 SETTINGS_FILE = str(USER_SETTINGS_DIR / "xzen_settings.json")
 FSR_SCAN_CACHE_FILE = str(USER_SETTINGS_DIR / "xzen_fsr_scan_cache.json")
