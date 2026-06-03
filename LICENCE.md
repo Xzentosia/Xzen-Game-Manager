@@ -13,7 +13,7 @@ The licensor grants you an additional copyright license to distribute copies of 
 ## Notices
 You must ensure that anyone who gets a copy of any part of the software from you also gets a copy of these terms or the URL for them above, as well as copies of any plain-text lines beginning with Required Notice: that the licensor provided with the software.
 
-Required Notice: Copyright (c) 2026 LXRylex (https://github.com/LXRylex)
+Required Notice: Copyright (c) 2026 LXRylex and Xzentosia (https://github.com/LXRylex, https://github.com/Xzentosia)
 
 ## Changes and New Works License
 The licensor grants you an additional copyright license to make changes and new works based on the software for any permitted purpose.
