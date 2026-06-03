@@ -29,15 +29,23 @@ This restriction includes, but is not limited to:
 
 You may not use this software to create or assist in creating another project that competes with, replaces, imitates, or substantially replicates this software, even if that project is noncommercial.
 
+## No Rebranded or Disguised Copies
+
+You may not copy, modify, rename, redesign, rebrand, restructure, refactor, obfuscate, translate, or otherwise alter this software, its source code, interface, assets, documentation, workflows, systems, architecture, or implementation in order to present it as a separate, original, competing, substitute, or independently developed project.
+
+Changing names, project names, variable names, function names, file names, UI design, colors, icons, wording, layout, project branding, code formatting, code organization, or other surface-level details does not remove the original license obligations and does not make the resulting software independent from this software if it is copied from, based on, derived from, adapted from, or substantially similar to this software.
+
+You may not present a copied, modified, renamed, redesigned, rebranded, refactored, or disguised version of this software as a new application, new project, independent release, unofficial update, continuation, replacement, or successor.
+
 ## No Misrepresentation
 
-You may not present modified, derived, rewritten, or rebranded versions of this software as an official update, continuation, replacement, successor, or affiliated project unless you have written permission from the licensor.
+You may not present modified, derived, rewritten, rebranded, or disguised versions of this software as an official update, continuation, replacement, successor, or affiliated project unless you have written permission from the licensor.
 
 You may not imply that your project is made, approved, endorsed, maintained, or supported by LXRylex or Xzentosia unless you have written permission.
 
 ## Independent Development
 
-These Additional Terms do not restrict independent development of software that does not copy, derive from, rely on, or use this software, its source code, assets, documentation, structure, workflow, interface, or implementation.
+These Additional Terms do not restrict independent development of software that does not copy, derive from, rely on, or use this software, its source code, assets, documentation, structure, workflow, interface, architecture, systems, or implementation.
 
 ## Fair Use
 
